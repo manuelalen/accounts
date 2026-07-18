@@ -2,69 +2,142 @@
 <html lang="es">
 <head>
     <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Ingesta de Datos - Data Lake</title>
-    <!-- Cargar el cliente oficial de Supabase desde CDN -->
+    <!-- Cliente oficial de Supabase desde CDN -->
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <style>
-        body { font-family: sans-serif; max-width: 500px; margin: 50px auto; padding: 20px; }
-        .box { border: 1px solid #ccc; padding: 20px; border-radius: 8px; }
-        input, button { display: block; width: 100%; margin: 15px 0; padding: 10px; }
-        button { background: #3ecf8e; color: white; border: none; font-weight: bold; cursor: pointer; }
-        #status { font-weight: bold; margin-top: 15px; }
+        body { 
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; 
+            max-width: 500px; 
+            margin: 60px auto; 
+            padding: 20px; 
+            background-color: #f8fafc; 
+        }
+        .box { 
+            border: 1px solid #e2e8f0; 
+            padding: 35px; 
+            border-radius: 12px; 
+            background: white; 
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05), 0 2px 4px -1px rgba(0, 0, 0, 0.03); 
+        }
+        h2 { 
+            margin-top: 0; 
+            color: #0f172a; 
+            font-size: 1.4rem; 
+            font-weight: 700;
+            margin-bottom: 8px;
+        }
+        p.subtitle {
+            color: #64748b;
+            font-size: 0.875rem;
+            margin-bottom: 24px;
+            margin-top: 0;
+        }
+        input[type="file"] { 
+            display: block; 
+            width: 100%; 
+            margin: 20px 0; 
+            padding: 14px; 
+            border: 2px dashed #cbd5e1; 
+            border-radius: 8px; 
+            background: #f8fafc;
+            box-sizing: border-box;
+            cursor: pointer;
+        }
+        button { 
+            display: block; 
+            width: 100%; 
+            padding: 12px; 
+            background: #3ecf8e; 
+            color: white; 
+            border: none; 
+            border-radius: 6px; 
+            font-weight: 600; 
+            font-size: 1rem; 
+            cursor: pointer; 
+            transition: background 0.2s ease; 
+        }
+        button:hover { 
+            background: #34b27b; 
+        }
+        #status { 
+            font-weight: 500; 
+            margin-top: 24px; 
+            padding: 12px; 
+            border-radius: 6px; 
+            display: none; 
+            white-space: pre-wrap; 
+            font-size: 0.9rem;
+            line-height: 1.4;
+        }
     </style>
 </head>
 <body>
 
 <div class="box">
     <h2>Subir CSV al Data Lake</h2>
+    <p class="subtitle">Estructuración cronológica automática (YYYY/MM/DD)</p>
+    
     <input type="file" id="csvFile" accept=".csv">
     <button onclick="uploadToStorage()">Subir Archivo</button>
+    
     <div id="status"></div>
 </div>
 
 <script>
-    // 1. Configurar las credenciales de tu proyecto de Supabase
-    // Reemplaza con tu URL real y tu anon key pública de Supabase
-    const SUPABASE_URL = "https://fzdpeakdudjfyvgrhrqq.supabase.co";
-    const SUPABASE_ANON_KEY = "TU_SUPABASE_ANON_KEY_AQUÍ";
+    // Marcadores que la Action de GitHub sobreescribirá en el despliegue
+    const SUPABASE_URL = "__SUPABASE_URL_PLACEHOLDER__";
+    const SUPABASE_ANON_KEY = "__SUPABASE_ANON_KEY_PLACEHOLDER__";
     
+    // Inicialización de la instancia conectada
     const supabase = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+
+    function showStatus(text, isError = false) {
+        const statusDiv = document.getElementById('status');
+        statusDiv.style.display = 'block';
+        statusDiv.style.backgroundColor = isError ? '#fef2f2' : '#f0fdf4';
+        statusDiv.style.color = isError ? '#991b1b' : '#166534';
+        statusDiv.style.border = `1px solid ${isError ? '#fca5a5' : '#bbf7d0'}`;
+        statusDiv.innerText = text;
+    }
 
     async function uploadToStorage() {
         const fileInput = document.getElementById('csvFile');
-        const statusDiv = document.getElementById('status');
         
         if (!fileInput.files.length) {
-            statusDiv.innerText = "❌ Por favor, selecciona un archivo CSV.";
+            showStatus("⚠️ Por favor, selecciona un archivo CSV primero.", true);
             return;
         }
 
         const file = fileInput.files[0];
-        statusDiv.innerText = "⏳ Subiendo archivo...";
+        showStatus("⏳ Transmitiendo archivo al almacenamiento de objetos...");
 
-        // 2. Generar la ruta dinámica en formato YYYY/MM/DD
+        // Computar estructura temporal del árbol de directorios
         const ahora = new Date();
         const yyyy = ahora.getFullYear();
         const mm = String(ahora.getMonth() + 1).padStart(2, '0');
         const dd = String(ahora.getDate()).padStart(2, '0');
         
-        // Estructura final: YYYY/MM/DD/nombre_archivo.csv
+        // Destino parametrizado: YYYY/MM/DD/nombre.csv
         const folderPath = `${yyyy}/${mm}/${dd}/${file.name}`;
 
-        // 3. Lanzar la subida directa a Supabase Storage
-        const { data, error } = await supabase.storage
-            .from('raw-data-lake')
-            .upload(folderPath, file, {
-                cacheControl: '3600',
-                upsert: true // Si el archivo ya existe hoy, lo sobrescribe
-            });
+        try {
+            const { data, error } = await supabase.storage
+                .from('raw-data-lake')
+                .upload(folderPath, file, {
+                    cacheControl: '3600',
+                    upsert: true
+                });
 
-        if (error) {
-            statusDiv.style.color = "red";
-            statusDiv.innerText = `❌ Error: ${error.message}`;
-        } else {
-            statusDiv.style.color = "green";
-            statusDiv.innerText = `✅ ¡Subido con éxito!\nRuta: ${data.path}`;
+            if (error) {
+                showStatus(`❌ Error devuelto por Supabase:\n${error.message}`, true);
+            } else {
+                showStatus(`✅ ¡Procesado con éxito!\nRuta en el cubo: ${data.path}`, false);
+                fileInput.value = ""; // Limpiar el componente de selección
+            }
+        } catch (err) {
+            showStatus(`❌ Fallo crítico de red durante la operación:\n${err.message}`, true);
         }
     }
 </script>

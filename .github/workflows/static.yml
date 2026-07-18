@@ -31,13 +31,22 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+
+      # Inyección dinámica de las credenciales usando los Secretos del repositorio
+      - name: Inject Supabase Credentials
+        run: |
+          sed -i "s|__SUPABASE_URL_PLACEHOLDER__|${{ secrets.SUPABASE_URL }}|g" index.html
+          sed -i "s|__SUPABASE_ANON_KEY_PLACEHOLDER__|${{ secrets.SUPABASE_ANON_KEY }}|g" index.html
+
       - name: Setup Pages
         uses: actions/configure-pages@v5
+
       - name: Upload artifact
         uses: actions/upload-pages-artifact@v3
         with:
-          # Upload entire repository
+          # Sube el contenido de la raíz del repositorio
           path: '.'
+
       - name: Deploy to GitHub Pages
         id: deployment
         uses: actions/deploy-pages@v5
