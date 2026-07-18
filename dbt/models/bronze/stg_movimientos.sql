@@ -1,19 +1,20 @@
 {{ config(
     materialized='incremental',
     schema='bronze',
-    unique_key='id',
-    pre_hook=[
-        "CREATE TEMP TABLE IF NOT EXISTS temp_raw_movimientos (id TEXT, monto NUMERIC, concepto TEXT, parsed_at TIMESTAMP);",
-        "TRUNCATE temp_raw_movimientos;",
-        -- Usamos una lógica de inserción segura desde el contenido que ya está en tu BD
-        "INSERT INTO temp_raw_movimientos SELECT * FROM public.raw_objects WHERE ingestion_day = '{{ var('target_date') }}';"
-    ]
+    unique_key='id'
 ) }}
 
+
 SELECT 
-    id,
-    monto,
-    concepto,
-    parsed_at,
+    (metadata->>'id') as id,
+    (metadata->>'monto')::numeric as monto,
+    (metadata->>'concepto') as concepto,
+    created_at as parsed_at,
     '{{ var("target_date") }}' as ingestion_day
-FROM temp_raw_movimientos
+FROM storage.objects
+WHERE bucket_id = 'raw-data-lake'
+AND name LIKE '{{ var("target_date") | replace("-", "/") }}%'
+
+{% if is_incremental() %}
+  AND created_at > (SELECT MAX(parsed_at) FROM {{ this }})
+{% endif %}
