@@ -11,4 +11,3 @@ models:
   supabase_analytics:
     bronze:
       +materialized: incremental
-      +schema: bronze

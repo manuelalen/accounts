@@ -1,6 +1,5 @@
 {{ config(
     materialized='incremental',
-    schema='bronze',
     unique_key='id'
 ) }}
 

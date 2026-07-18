@@ -2,7 +2,7 @@ name: dbt Run Pipeline
 on:
   workflow_dispatch:
   repository_dispatch:
-    types: [new_file_uploaded]
+    types: [storage_file_uploaded]
 
 jobs:
   dbt_run:
