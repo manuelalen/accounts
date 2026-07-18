@@ -16,7 +16,6 @@ models:
       +materialized: view
       +schema: staging
     bronze:
-      +materialized: incremental
       +schema: bronze
       +database: postgres
     marts:
