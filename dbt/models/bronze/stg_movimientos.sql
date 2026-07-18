@@ -1,25 +1,19 @@
 {{ config(
     materialized='incremental',
     schema='bronze',
-    unique_key='id'
+    unique_key='id',
+    pre_hook=[
+        "CREATE TEMP TABLE IF NOT EXISTS temp_raw_movimientos (id TEXT, monto NUMERIC, concepto TEXT, parsed_at TIMESTAMP);",
+        "TRUNCATE temp_raw_movimientos;",
+        -- Usamos una lógica de inserción segura desde el contenido que ya está en tu BD
+        "INSERT INTO temp_raw_movimientos SELECT * FROM public.raw_objects WHERE ingestion_day = '{{ var('target_date') }}';"
+    ]
 ) }}
 
-
-WITH raw_data AS (
-    SELECT 
-        (regexp_split_to_array(line, ','))[1] as id,
-        (regexp_split_to_array(line, ','))[2]::numeric as monto,
-        (regexp_split_to_array(line, ','))[3] as concepto,
-        (regexp_split_to_array(line, ','))[4]::timestamp as parsed_at
-    FROM (
-        -- Leemos el archivo mediante el path directo al sistema de archivos de Supabase
-        SELECT unnest(string_to_array(convert_from(pg_read_binary_file('/var/lib/postgresql/data/storage/raw-data-lake/' || '{{ var("target_date") | replace("-", "/") }}' || '/movimientos.csv'), 'UTF8'), E'\n')) as line
-    ) as t
-    WHERE line NOT LIKE 'id,%' 
-)
-
-SELECT * FROM raw_data WHERE id IS NOT NULL
-
-{% if is_incremental() %}
-  AND parsed_at > (SELECT MAX(parsed_at) FROM {{ this }})
-{% endif %}
+SELECT 
+    id,
+    monto,
+    concepto,
+    parsed_at,
+    '{{ var("target_date") }}' as ingestion_day
+FROM temp_raw_movimientos
