@@ -5,19 +5,10 @@ config-version: 2
 profile: 'supabase_profile'
 
 model-paths: ["models"]
-analysis-paths: ["analyses"]
-test-paths: ["tests"]
-seed-paths: ["seeds"]
-macro-paths: ["macros"]
+
 
 models:
   supabase_analytics:
-    staging:
-      +materialized: view
-      +schema: staging
     bronze:
+      +materialized: incremental
       +schema: bronze
-      +database: postgres
-    marts:
-      +materialized: table
-      +schema: analytics

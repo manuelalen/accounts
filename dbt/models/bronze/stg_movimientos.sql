@@ -4,6 +4,18 @@
     unique_key='id'
 ) }}
 
+WITH raw_data AS (
+    -- Esta consulta accede al catálogo de almacenamiento de Supabase
+    -- sin depender de funciones externas que den error de permisos.
+    SELECT 
+        (metadata->>'id') as id,
+        (metadata->>'monto')::numeric as monto,
+        (metadata->>'concepto') as concepto,
+        created_at as parsed_at
+    FROM storage.objects
+    WHERE bucket_id = 'raw-data-lake'
+    AND name LIKE '{{ var("target_date") | replace("-", "/") }}%'
+)
 
 SELECT 
     id,
@@ -11,5 +23,9 @@ SELECT
     concepto,
     parsed_at,
     '{{ var("target_date") }}' as ingestion_day
-FROM bronze.movimientos_raw -- CAMBIA ESTO POR EL NOMBRE DE TU TABLA REAL DE DATOS
-WHERE ingestion_day = '{{ var("target_date") }}'
+FROM raw_data
+WHERE id IS NOT NULL
+
+{% if is_incremental() %}
+  AND parsed_at > (SELECT MAX(parsed_at) FROM {{ this }})
+{% endif %}
