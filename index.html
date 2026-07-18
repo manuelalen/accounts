@@ -68,8 +68,35 @@
             if (error) {
                 showStatus(`❌ Error de Supabase:\n${error.message}`, true);
             } else {
-                showStatus(`✅ ¡Procesado con éxito!\nRuta en el storage: ${data.path}`, false);
-                fileInput.value = ""; // Limpiar input
+                showStatus(`⏳ Insertando datos en bronze...`, false);
+                fileInput.value = "";
+
+                // Llamar a la Edge Function para procesar el CSV
+                try {
+                    const edgeRes = await fetch(`${SUPABASE_URL}/functions/v1/trigger-dbt-pipeline`, {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                            'Authorization': `Bearer ${SUPABASE_ANON_KEY}`
+                        },
+                        body: JSON.stringify({
+                            type: 'INSERT',
+                            record: {
+                                bucket_id: 'raw-data-lake',
+                                name: data.path
+                            }
+                        })
+                    });
+
+                    if (!edgeRes.ok) {
+                        const errText = await edgeRes.text();
+                        showStatus(`⚠️ Archivo subido, pero error al procesar:\n${errText}`, true);
+                    } else {
+                        showStatus(`✅ CSV ingestado en bronze.stg_movimientos`, false);
+                    }
+                } catch (fnErr: any) {
+                    showStatus(`⚠️ Archivo subido, pero falló la función:\n${fnErr.message}`, true);
+                }
             }
         } catch (err) {
             showStatus(`❌ Fallo en la operación:\n${err.message}`, true);
