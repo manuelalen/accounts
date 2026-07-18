@@ -57,6 +57,14 @@ def download_csv(path: str) -> str:
 
 
 def parse_csv(text: str) -> list[dict]:
+    lines = text.strip().split('\n')
+    print(f"  Primeras 3 líneas:")
+    for i, l in enumerate(lines[:3]):
+        print(f"    [{i}]: {l[:200]}")
+    if len(lines) < 2:
+        return []
+
+    # Intentar con DictReader (asume header)
     reader = csv.DictReader(io.StringIO(text))
     rows = []
     for row in reader:
@@ -65,6 +73,21 @@ def parse_csv(text: str) -> list[dict]:
         concepto = row.get("concepto", "").strip()
         if rid or monto or concepto:
             rows.append({"id": rid, "monto": monto, "concepto": concepto})
+
+    if rows:
+        return rows
+
+    # Fallback: sin header (columnas posicionales)
+    print(f"  DictReader no encontró filas. Probando parse posicional...")
+    print(f"  Columnas detectadas: {csv.DictReader(io.StringIO(text)).fieldnames}")
+    for i in range(1, len(lines)):
+        cols = lines[i].split(',')
+        if len(cols) >= 3:
+            rows.append({
+                "id": cols[0].strip(),
+                "monto": cols[1].strip(),
+                "concepto": cols[2].strip(),
+            })
     return rows
 
 
