@@ -3,7 +3,7 @@ import os
 import sys
 import csv
 import io
-import json
+import hashlib
 from datetime import date, datetime
 import requests
 import psycopg2
@@ -20,12 +20,12 @@ DB_NAME = "postgres"
 
 TODAY = date.today()
 PREFIX = f"{TODAY.year}/{TODAY.month:02d}/{TODAY.day:02d}"
+INGESTION_DAY = f"{TODAY.year}-{TODAY.month:02d}-{TODAY.day:02d}"
 
 HEADERS = {"Authorization": f"Bearer {ANON_KEY}"}
 
 
 def get_files_from_db() -> list[str]:
-    """Obtiene paths de CSVs del día desde storage.objects via SQL directo."""
     conn = psycopg2.connect(
         host=DB_HOST, port=DB_PORT, user=DB_USER,
         password=DB_PASSWORD, dbname=DB_NAME,
@@ -45,48 +45,52 @@ def get_files_from_db() -> list[str]:
 def download_csv(path: str) -> str:
     url = f"{SUPABASE_URL}/storage/v1/object/raw-data-lake/{path}"
     resp = requests.get(url, headers=HEADERS)
-    if resp.status_code == 400:
-        # Intentar con ruta normalizada
-        clean = path.lstrip("/")
-        url2 = f"{SUPABASE_URL}/storage/v1/object/raw-data-lake/{clean}"
-        resp2 = requests.get(url2, headers=HEADERS)
-        if resp2.ok:
-            return resp2.text
     resp.raise_for_status()
     return resp.text
 
 
+def parse_importe(val: str) -> float:
+    """Convierte formato español ('-29,20' o '-29.20') a float."""
+    val = val.strip().replace('.', '').replace(',', '.')
+    return float(val)
+
+
 def parse_csv(text: str) -> list[dict]:
-    lines = text.strip().split('\n')
-    print(f"  Primeras 3 líneas:")
-    for i, l in enumerate(lines[:3]):
-        print(f"    [{i}]: {l[:200]}")
-    if len(lines) < 2:
-        return []
-
-    # Intentar con DictReader (asume header)
     reader = csv.DictReader(io.StringIO(text))
-    rows = []
-    for row in reader:
-        rid = row.get("id", "").strip()
-        monto = row.get("monto", "").strip()
-        concepto = row.get("concepto", "").strip()
-        if rid or monto or concepto:
-            rows.append({"id": rid, "monto": monto, "concepto": concepto})
+    fieldnames = reader.fieldnames or []
 
-    if rows:
+    print(f"  Columnas detectadas: {fieldnames}")
+
+    if 'Concepto' in fieldnames and 'Importe' in fieldnames:
+        print(f"  Mapeo directo: Concepto → concepto, Importe → monto")
+        rows = []
+        for row in reader:
+            concepto = (row.get('Concepto') or '').strip()
+            importe_raw = (row.get('Importe') or '0').strip()
+            try:
+                monto = parse_importe(importe_raw)
+            except ValueError:
+                print(f"  Importe inválido: '{importe_raw}'")
+                continue
+            if not concepto and monto == 0:
+                continue
+            # Generar id único por fila
+            raw = f"{concepto}{monto}{INGESTION_DAY}"
+            fid = hashlib.md5(raw.encode()).hexdigest()[:12]
+            rows.append({"id": fid, "monto": str(monto), "concepto": concepto})
         return rows
 
-    # Fallback: sin header (columnas posicionales)
-    print(f"  DictReader no encontró filas. Probando parse posicional...")
-    print(f"  Columnas detectadas: {csv.DictReader(io.StringIO(text)).fieldnames}")
+    print(f"  Columnas no reconocidas, intentando parseo posicional...")
+    lines = text.strip().split('\n')
+    rows = []
     for i in range(1, len(lines)):
         cols = lines[i].split(',')
         if len(cols) >= 3:
+            rid = hashlib.md5(lines[i].encode()).hexdigest()[:12]
             rows.append({
-                "id": cols[0].strip(),
-                "monto": cols[1].strip(),
-                "concepto": cols[2].strip(),
+                "id": rid,
+                "monto": cols[0].strip(),
+                "concepto": cols[1].strip(),
             })
     return rows
 
@@ -109,7 +113,7 @@ def ensure_table(conn):
 def main():
     files = get_files_from_db()
     if not files:
-        print(f"files=0 (no se encontraron CSVs con prefix {PREFIX})")
+        print(f"files=0")
         return
 
     all_rows = []
@@ -118,14 +122,14 @@ def main():
         try:
             text = download_csv(path)
         except Exception as e:
-            print(f"  Error descargando {path}: {e}")
+            print(f"  Error: {e}")
             continue
         rows = parse_csv(text)
         if rows:
-            print(f"  {len(rows)} filas en {path}")
+            print(f"  {len(rows)} filas")
             all_rows.extend(rows)
         else:
-            print(f"  0 filas (formato inesperado)")
+            print(f"  0 filas")
 
     if not all_rows:
         print(f"rows=0")
@@ -138,9 +142,8 @@ def main():
     ensure_table(conn)
 
     now = datetime.utcnow().isoformat()
-    ingestion_day = f"{TODAY.year}-{TODAY.month:02d}-{TODAY.day:02d}"
     records = [
-        (r["id"], r["monto"], r["concepto"], now, ingestion_day)
+        (r["id"], r["monto"], r["concepto"], now, INGESTION_DAY)
         for r in all_rows
     ]
     execute_values(conn.cursor(), """
