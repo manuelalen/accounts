@@ -12,3 +12,9 @@ sources:
               column_name: id
           - not_null:
               column_name: id
+
+  - name: supabase_storage
+    database: postgres
+    schema: public 
+    tables:
+      - name: raw_objects
