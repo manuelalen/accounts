@@ -9,18 +9,25 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v3
-      
+
       - name: Setup Python
         uses: actions/setup-python@v4
         with:
           python-version: '3.10'
 
-      - name: Install dbt
-        run: pip install dbt-postgres
+      - name: Install dependencies
+        run: pip install dbt-postgres requests psycopg2-binary
+
+      - name: Ingest CSV files from Storage
+        id: ingest
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_ANON_KEY: ${{ secrets.SUPABASE_ANON_KEY }}
+          DBT_DB_PASSWORD: ${{ secrets.DBT_DB_PASSWORD }}
+        run: python scripts/ingest_from_storage.py
 
       - name: Run dbt
         env:
-          # Debe coincidir con la variable en tu profiles.yml
           DBT_DB_PASSWORD: ${{ secrets.DBT_DB_PASSWORD }}
         run: |
           TARGET_DATE=$(date +'%Y-%m-%d')
