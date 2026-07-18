@@ -15,16 +15,14 @@ jobs:
         with:
           python-version: '3.10'
 
-      - name: Install dependencies
-        run: |
-          pip install dbt-postgres
-          # Instalamos las dependencias definidas en packages.yml
-          dbt deps --project-dir dbt --profiles-dir dbt
+      - name: Install dbt
+        run: pip install dbt-postgres
 
       - name: Run dbt
         env:
           DBT_ENV_SECRET_PASSWORD: ${{ secrets.DBT_DB_PASSWORD }}
         run: |
           TARGET_DATE=$(date +'%Y-%m-%d')
+          # Ejecutamos sin dbt deps, ya que no hay paquetes externos
           dbt run --project-dir dbt --profiles-dir dbt --select stg_movimientos \
                   --vars "{'target_date': '$TARGET_DATE'}"
