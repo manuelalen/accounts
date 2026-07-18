@@ -1,7 +1,7 @@
 name: dbt Run Pipeline
 on:
-  workflow_dispatch: # Permite ejecución manual (corregido)
-  repository_dispatch: # Permite el trigger automático desde Supabase
+  workflow_dispatch:
+  repository_dispatch:
     types: [new_file_uploaded]
 
 jobs:
@@ -15,14 +15,16 @@ jobs:
         with:
           python-version: '3.10'
 
-      - name: Install dbt
-        run: pip install dbt-postgres
+      - name: Install dependencies
+        run: |
+          pip install dbt-postgres
+          # Instalamos las dependencias definidas en packages.yml
+          dbt deps --project-dir dbt --profiles-dir dbt
 
       - name: Run dbt
         env:
           DBT_ENV_SECRET_PASSWORD: ${{ secrets.DBT_DB_PASSWORD }}
         run: |
-          # Detectamos fecha de hoy para el archivo
           TARGET_DATE=$(date +'%Y-%m-%d')
           dbt run --project-dir dbt --profiles-dir dbt --select stg_movimientos \
                   --vars "{'target_date': '$TARGET_DATE'}"
