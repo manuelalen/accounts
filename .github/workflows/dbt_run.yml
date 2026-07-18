@@ -16,7 +16,10 @@ jobs:
           python-version: '3.10'
 
       - name: Install dependencies
-        run: pip install dbt-postgres requests psycopg2-binary
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq postgresql-client
+          pip install dbt-postgres requests psycopg2-binary
 
       - name: Ingest CSV files from Storage
         id: ingest
@@ -33,3 +36,11 @@ jobs:
           TARGET_DATE=$(date +'%Y-%m-%d')
           dbt run --project-dir dbt --profiles-dir dbt --select stg_movimientos \
                   --vars "{'target_date': '$TARGET_DATE'}"
+
+      - name: Verify row count
+        env:
+          DBT_DB_PASSWORD: ${{ secrets.DBT_DB_PASSWORD }}
+        run: |
+          PGPASSWORD=$DBT_DB_PASSWORD psql -h aws-1-eu-central-2.pooler.supabase.com \
+            -p 6543 -U postgres.fzdpeakdudjfyvgrhrqq -d postgres \
+            -c "SELECT COUNT(*) AS total_rows FROM bronze.stg_movimientos"
