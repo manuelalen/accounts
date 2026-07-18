@@ -4,94 +4,46 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Ingesta de Datos - Data Lake</title>
-    <!-- Cliente oficial de Supabase desde CDN -->
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <style>
-        body { 
-            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; 
-            max-width: 500px; 
-            margin: 60px auto; 
-            padding: 20px; 
-            background-color: #f8fafc; 
-        }
-        .box { 
-            border: 1px solid #e2e8f0; 
-            padding: 35px; 
-            border-radius: 12px; 
-            background: white; 
-            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05), 0 2px 4px -1px rgba(0, 0, 0, 0.03); 
-        }
-        h2 { 
-            margin-top: 0; 
-            color: #0f172a; 
-            font-size: 1.4rem; 
-            font-weight: 700;
-            margin-bottom: 8px;
-        }
-        p.subtitle {
-            color: #64748b;
-            font-size: 0.875rem;
-            margin-bottom: 24px;
-            margin-top: 0;
-        }
-        input[type="file"] { 
-            display: block; 
-            width: 100%; 
-            margin: 20px 0; 
-            padding: 14px; 
-            border: 2px dashed #cbd5e1; 
-            border-radius: 8px; 
-            background: #f8fafc;
-            box-sizing: border-box;
-            cursor: pointer;
-        }
-        button { 
-            display: block; 
-            width: 100%; 
-            padding: 12px; 
-            background: #3ecf8e; 
-            color: white; 
-            border: none; 
-            border-radius: 6px; 
-            font-weight: 600; 
-            font-size: 1rem; 
-            cursor: pointer; 
-            transition: background 0.2s ease; 
-        }
-        button:hover { 
-            background: #34b27b; 
-        }
-        #status { 
-            font-weight: 500; 
-            margin-top: 24px; 
-            padding: 12px; 
-            border-radius: 6px; 
-            display: none; 
-            white-space: pre-wrap; 
-            font-size: 0.9rem;
-            line-height: 1.4;
-        }
+        body { font-family: -apple-system, BlinkMacSystemFont, sans-serif; max-width: 500px; margin: 60px auto; padding: 20px; background-color: #f8fafc; }
+        .box { border: 1px solid #e2e8f0; padding: 35px; border-radius: 12px; background: white; box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05); }
+        h2 { margin-top: 0; color: #0f172a; }
+        input[type="file"] { display: block; width: 100%; margin: 20px 0; padding: 14px; border: 2px dashed #cbd5e1; border-radius: 8px; box-sizing: border-box; }
+        button { display: block; width: 100%; padding: 12px; background: #3ecf8e; color: white; border: none; border-radius: 6px; font-weight: 600; cursor: pointer; }
+        #status { font-weight: 500; margin-top: 24px; padding: 12px; border-radius: 6px; display: none; white-space: pre-wrap; font-size: 0.9rem; }
     </style>
 </head>
 <body>
 
 <div class="box">
     <h2>Subir CSV al Data Lake</h2>
-    <p class="subtitle">Estructuración cronológica automática (YYYY/MM/DD)</p>
-    
     <input type="file" id="csvFile" accept=".csv">
     <button onclick="uploadToStorage()">Subir Archivo</button>
-    
     <div id="status"></div>
 </div>
 
 <script>
-    // Marcadores que la Action de GitHub sobreescribirá en el despliegue
+    // Captura de errores críticos globales
+    window.onerror = function(message, source, lineno, colno, error) {
+        alert("🚨 ERROR CRÍTICO JS:\n" + message + "\nLínea: " + lineno);
+        return false;
+    };
+
     const SUPABASE_URL = "__SUPABASE_URL_PLACEHOLDER__";
     const SUPABASE_ANON_KEY = "__SUPABASE_ANON_KEY_PLACEHOLDER__";
     
-    // Inicialización de la instancia conectada
-    const supabase = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+    let supabase = null;
+    
+    try {
+        // Verificar si GitHub Actions ha hecho la sustitución correctamente
+        if (SUPABASE_URL.includes("PLACEHOLDER") || SUPABASE_ANON_KEY.includes("PLACEHOLDER")) {
+            console.warn("Advertencia: Los marcadores no han sido sustituidos todavía.");
+        }
+        supabase = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+    } catch (e) {
+        alert("❌ Error al inicializar Supabase Client:\n" + e.message);
+    }
 
     function showStatus(text, isError = false) {
         const statusDiv = document.getElementById('status');
@@ -103,8 +55,9 @@
     }
 
     async function uploadToStorage() {
-        const fileInput = document.getElementById('csvFile');
+        alert("🔘 Botón pulsado correctamente. Iniciando función...");
         
+        const fileInput = document.getElementById('csvFile');
         if (!fileInput.files.length) {
             showStatus("⚠️ Por favor, selecciona un archivo CSV primero.", true);
             return;
@@ -113,16 +66,18 @@
         const file = fileInput.files[0];
         showStatus("⏳ Transmitiendo archivo al almacenamiento de objetos...");
 
-        // Computar estructura temporal del árbol de directorios
         const ahora = new Date();
         const yyyy = ahora.getFullYear();
         const mm = String(ahora.getMonth() + 1).padStart(2, '0');
         const dd = String(ahora.getDate()).padStart(2, '0');
-        
-        // Destino parametrizado: YYYY/MM/DD/nombre.csv
         const folderPath = `${yyyy}/${mm}/${dd}/${file.name}`;
 
         try {
+            if (!supabase) {
+                showStatus("❌ El cliente de Supabase no está configurado.", true);
+                return;
+            }
+
             const { data, error } = await supabase.storage
                 .from('raw-data-lake')
                 .upload(folderPath, file, {
@@ -131,13 +86,13 @@
                 });
 
             if (error) {
-                showStatus(`❌ Error devuelto por Supabase:\n${error.message}`, true);
+                showStatus(`❌ Error de Supabase:\n${error.message}`, true);
             } else {
-                showStatus(`✅ ¡Procesado con éxito!\nRuta en el cubo: ${data.path}`, false);
-                fileInput.value = ""; // Limpiar el componente de selección
+                showStatus(`✅ ¡Procesado con éxito!\nRuta: ${data.path}`, false);
+                fileInput.value = "";
             }
         } catch (err) {
-            showStatus(`❌ Fallo crítico de red durante la operación:\n${err.message}`, true);
+            showStatus(`❌ Fallo en la operación:\n${err.message}`, true);
         }
     }
 </script>
