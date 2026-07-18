@@ -4,23 +4,23 @@
     unique_key='id'
 ) }}
 
-
-WITH raw_data AS (
+WITH raw_file AS (
     SELECT 
-        (metadata->>'id') as id,
-        (metadata->>'monto')::numeric as monto,
-        (metadata->>'concepto') as concepto,
-        (metadata->>'parsed_at')::timestamp as parsed_at
-    FROM storage.objects
-    WHERE bucket_id = 'raw-data-lake'
-    AND name LIKE '{{ var("target_date") | replace("-", "/") }}%'
+        regexp_split_to_array(line, ',') as columns
+    FROM (
+        SELECT unnest(string_to_array(convert_from(storage.download('raw-data-lake', '{{ var("target_date") | replace("-", "/") }}/movimientos.csv'), 'UTF8'), E'\n')) as line
+    ) as t
+    WHERE line NOT LIKE 'id,%' -- Saltamos el header
 )
 
 SELECT 
-    id,
-    monto,
-    concepto,
-    parsed_at,
+    columns[1]::text as id,
+    columns[2]::numeric as monto,
+    columns[3]::text as concepto,
+    columns[4]::timestamp as parsed_at,
     '{{ var("target_date") }}' as ingestion_day
-FROM raw_data
-WHERE id IS NOT NULL -- Filtramos los registros vacíos o mal parseados
+FROM raw_file
+
+{% if is_incremental() %}
+  WHERE parsed_at > (SELECT MAX(parsed_at) FROM {{ this }})
+{% endif %}

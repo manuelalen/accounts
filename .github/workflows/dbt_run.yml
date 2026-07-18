@@ -20,9 +20,8 @@ jobs:
 
       - name: Run dbt
         env:
-          DBT_ENV_SECRET_PASSWORD: ${{ secrets.DBT_DB_PASSWORD }}
+          DBT_DATABASE_URL: ${{ secrets.DBT_DATABASE_URL }}
         run: |
           TARGET_DATE=$(date +'%Y-%m-%d')
-          # Ejecutamos sin dbt deps, ya que no hay paquetes externos
           dbt run --project-dir dbt --profiles-dir dbt --select stg_movimientos \
                   --vars "{'target_date': '$TARGET_DATE'}"
