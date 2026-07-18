@@ -1,0 +1,33 @@
+name: Execute dbt Pipeline on Upload
+
+on:
+  repository_dispatch:
+    types: [storage_file_uploaded]
+
+jobs:
+  run-dbt:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-python: '3.10'
+          cache: 'pip'
+
+      - name: Install Dependencies
+        run: |
+          pip install dbt-core dbt-mysql # O el adaptador que uses (snowflake, bigquery, etc.)
+
+      - name: Execute dbt for the Specific Date Partition
+        env:
+          # Configura aquí las variables de entorno de conexión a tu base de datos
+          DBT_ENV_SECRET_PASSWORD: ${{ secrets.DBT_DB_PASSWORD }}
+        run: |
+          echo "Procesando el archivo: ${{ github.event.client_payload.file_path }}"
+          echo "Fecha de ejecución calculada: ${{ github.event.client_payload.execution_date }}"
+          
+          # Lanzamos dbt run pasando la fecha como una variable al modelo
+          dbt run --select path.to.your.bronze.model --vars "{'target_date': '${{ github.event.client_payload.execution_date }}'}"
