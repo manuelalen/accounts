@@ -146,6 +146,9 @@ def main():
         (r["id"], r["monto"], r["concepto"], now, INGESTION_DAY)
         for r in all_rows
     ]
+    # Reemplazar datos de hoy para evitar duplicados
+    with conn.cursor() as cur:
+        cur.execute("DELETE FROM bronze.stg_movimientos WHERE ingestion_day = %s", (INGESTION_DAY,))
     execute_values(conn.cursor(), """
         INSERT INTO bronze.stg_movimientos (id, monto, concepto, parsed_at, ingestion_day)
         VALUES %s
