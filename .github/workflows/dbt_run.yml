@@ -20,7 +20,7 @@ jobs:
 
       - name: Run dbt
         env:
-          # Inyectamos el secreto exacto que tienes en el repositorio
+          # Debe coincidir con la variable en tu profiles.yml
           DBT_DB_PASSWORD: ${{ secrets.DBT_DB_PASSWORD }}
         run: |
           TARGET_DATE=$(date +'%Y-%m-%d')
