@@ -7,6 +7,7 @@ import json
 from datetime import date, datetime
 import requests
 import psycopg2
+from psycopg2.extras import execute_values
 
 SUPABASE_URL = os.environ["SUPABASE_URL"]
 ANON_KEY = os.environ["SUPABASE_ANON_KEY"]
@@ -17,28 +18,40 @@ DB_PORT = 6543
 DB_USER = "postgres.fzdpeakdudjfyvgrhrqq"
 DB_NAME = "postgres"
 
-HEADERS = {"Authorization": f"Bearer {ANON_KEY}"}
-
 TODAY = date.today()
 PREFIX = f"{TODAY.year}/{TODAY.month:02d}/{TODAY.day:02d}"
 
+HEADERS = {"Authorization": f"Bearer {ANON_KEY}"}
 
-def list_files() -> list[dict]:
-    url = f"{SUPABASE_URL}/storage/v1/object/list/raw-data-lake"
-    resp = requests.post(url, headers=HEADERS, json={
-        "prefix": PREFIX, "limit": 100, "offset": 0,
-        "sortBy": {"column": "name", "order": "asc"},
-    })
-    if resp.status_code == 404:
-        print(f"No hay archivos en {PREFIX}")
-        return []
-    resp.raise_for_status()
-    return resp.json()
+
+def get_files_from_db() -> list[str]:
+    """Obtiene paths de CSVs del día desde storage.objects via SQL directo."""
+    conn = psycopg2.connect(
+        host=DB_HOST, port=DB_PORT, user=DB_USER,
+        password=DB_PASSWORD, dbname=DB_NAME,
+    )
+    with conn.cursor() as cur:
+        cur.execute("""
+            SELECT name FROM storage.objects
+            WHERE bucket_id = 'raw-data-lake'
+            AND name LIKE %s
+            ORDER BY created_at DESC
+        """, (f"{PREFIX}%",))
+        rows = cur.fetchall()
+    conn.close()
+    return [r[0] for r in rows]
 
 
 def download_csv(path: str) -> str:
     url = f"{SUPABASE_URL}/storage/v1/object/raw-data-lake/{path}"
     resp = requests.get(url, headers=HEADERS)
+    if resp.status_code == 400:
+        # Intentar con ruta normalizada
+        clean = path.lstrip("/")
+        url2 = f"{SUPABASE_URL}/storage/v1/object/raw-data-lake/{clean}"
+        resp2 = requests.get(url2, headers=HEADERS)
+        if resp2.ok:
+            return resp2.text
     resp.raise_for_status()
     return resp.text
 
@@ -70,31 +83,26 @@ def ensure_table(conn):
     conn.commit()
 
 
-def insert_records(conn, records: list[tuple]):
-    from psycopg2.extras import execute_values
-    with conn.cursor() as cur:
-        execute_values(cur, """
-            INSERT INTO bronze.stg_movimientos (id, monto, concepto, parsed_at, ingestion_day)
-            VALUES %s
-        """, records)
-    conn.commit()
-
-
 def main():
-    files = list_files()
+    files = get_files_from_db()
     if not files:
-        print(f"files=0")
+        print(f"files=0 (no se encontraron CSVs con prefix {PREFIX})")
         return
 
     all_rows = []
-    for f in files:
-        name = f["name"]
-        print(f"Descargando {name}...")
-        text = download_csv(name)
+    for path in files:
+        print(f"Descargando {path}...")
+        try:
+            text = download_csv(path)
+        except Exception as e:
+            print(f"  Error descargando {path}: {e}")
+            continue
         rows = parse_csv(text)
         if rows:
-            print(f"  {len(rows)} filas en {name}")
+            print(f"  {len(rows)} filas en {path}")
             all_rows.extend(rows)
+        else:
+            print(f"  0 filas (formato inesperado)")
 
     if not all_rows:
         print(f"rows=0")
@@ -112,7 +120,11 @@ def main():
         (r["id"], r["monto"], r["concepto"], now, ingestion_day)
         for r in all_rows
     ]
-    insert_records(conn, records)
+    execute_values(conn.cursor(), """
+        INSERT INTO bronze.stg_movimientos (id, monto, concepto, parsed_at, ingestion_day)
+        VALUES %s
+    """, records)
+    conn.commit()
     conn.close()
 
     print(f"rows={len(records)}")
