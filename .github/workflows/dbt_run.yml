@@ -1,8 +1,15 @@
-name: Execute dbt Pipeline on Upload
+name: dbt run
 
 on:
   repository_dispatch:
     types: [storage_file_uploaded]
+
+  workflow_dispatch:
+    inputs:
+      manual_date:
+        description: 'Fecha a procesar manualmente (formato: YYYY-MM-DD)'
+        required: true
+        default: '2026-07-18' 
 
 jobs:
   run-dbt:
@@ -14,20 +21,25 @@ jobs:
       - name: Setup Python
         uses: actions/setup-python@v5
         with:
-          python-python: '3.10'
+          python-version: '3.10'
           cache: 'pip'
 
       - name: Install Dependencies
         run: |
-          pip install dbt-core dbt-mysql # O el adaptador que uses (snowflake, bigquery, etc.)
+          pip install dbt-core dbt-mysql
 
       - name: Execute dbt for the Specific Date Partition
         env:
-          # Configura aquí las variables de entorno de conexión a tu base de datos
           DBT_ENV_SECRET_PASSWORD: ${{ secrets.DBT_DB_PASSWORD }}
         run: |
-          echo "Procesando el archivo: ${{ github.event.client_payload.file_path }}"
-          echo "Fecha de ejecución calculada: ${{ github.event.client_payload.execution_date }}"
+          # Evaluamos si viene de Supabase (client_payload) o si es manual (inputs)
+          IF_SUBASPASE="${{ github.event.client_payload.execution_date }}"
+          IF_MANUAL="${{ github.event.inputs.manual_date }}"
           
-          # Lanzamos dbt run pasando la fecha como una variable al modelo
-          dbt run --select path.to.your.bronze.model --vars "{'target_date': '${{ github.event.client_payload.execution_date }}'}"
+          # Elegimos la variable que no esté vacía
+          TARGET_DATE=${IF_SUBASPASE:-$IF_MANUAL}
+          
+          echo "Fecha de ejecución final a procesar: $TARGET_DATE"
+          
+          # Lanzamos dbt pasándole la fecha resultante
+          dbt run --select path.to.your.bronze.model --vars "{'target_date': '$TARGET_DATE'}
