@@ -9,7 +9,7 @@
         body { font-family: -apple-system, BlinkMacSystemFont, sans-serif; max-width: 500px; margin: 60px auto; padding: 20px; background-color: #f8fafc; }
         .box { border: 1px solid #e2e8f0; padding: 35px; border-radius: 12px; background: white; box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05); }
         h2 { margin-top: 0; color: #0f172a; }
-        input[type="file"] { display: block; width: 100%; margin: 20px 0; padding: 14px; border: 2px dashed #cbd5e1; border-radius: 8px; box-sizing: border-box; }
+        input[type="file"] { display: block; width: 100%; margin: 20px 0; padding: 14px; border: 2px dashed #cbd5e1; border-radius: 8px; box-sizing: border-box; cursor: pointer; }
         button { display: block; width: 100%; padding: 12px; background: #3ecf8e; color: white; border: none; border-radius: 6px; font-weight: 600; cursor: pointer; }
         #status { font-weight: 500; margin-top: 24px; padding: 12px; border-radius: 6px; display: none; white-space: pre-wrap; font-size: 0.9rem; }
     </style>
@@ -24,26 +24,11 @@
 </div>
 
 <script>
-    // Captura de errores críticos globales
-    window.onerror = function(message, source, lineno, colno, error) {
-        alert("🚨 ERROR CRÍTICO JS:\n" + message + "\nLínea: " + lineno);
-        return false;
-    };
-
     const SUPABASE_URL = "__SUPABASE_URL_PLACEHOLDER__";
     const SUPABASE_ANON_KEY = "__SUPABASE_ANON_KEY_PLACEHOLDER__";
     
-    let supabase = null;
-    
-    try {
-        // Verificar si GitHub Actions ha hecho la sustitución correctamente
-        if (SUPABASE_URL.includes("PLACEHOLDER") || SUPABASE_ANON_KEY.includes("PLACEHOLDER")) {
-            console.warn("Advertencia: Los marcadores no han sido sustituidos todavía.");
-        }
-        supabase = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
-    } catch (e) {
-        alert("❌ Error al inicializar Supabase Client:\n" + e.message);
-    }
+    // CORRECCIÓN: Le llamamos supabaseClient para que no rompa la librería nativa
+    const supabaseClient = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
     function showStatus(text, isError = false) {
         const statusDiv = document.getElementById('status');
@@ -55,16 +40,15 @@
     }
 
     async function uploadToStorage() {
-        alert("🔘 Botón pulsado correctamente. Iniciando función...");
-        
         const fileInput = document.getElementById('csvFile');
+        
         if (!fileInput.files.length) {
             showStatus("⚠️ Por favor, selecciona un archivo CSV primero.", true);
             return;
         }
 
         const file = fileInput.files[0];
-        showStatus("⏳ Transmitiendo archivo al almacenamiento de objetos...");
+        showStatus("⏳ Subiendo archivo al Data Lake...");
 
         const ahora = new Date();
         const yyyy = ahora.getFullYear();
@@ -73,12 +57,8 @@
         const folderPath = `${yyyy}/${mm}/${dd}/${file.name}`;
 
         try {
-            if (!supabase) {
-                showStatus("❌ El cliente de Supabase no está configurado.", true);
-                return;
-            }
-
-            const { data, error } = await supabase.storage
+            // Usamos la variable corregida aquí
+            const { data, error } = await supabaseClient.storage
                 .from('raw-data-lake')
                 .upload(folderPath, file, {
                     cacheControl: '3600',
@@ -88,8 +68,8 @@
             if (error) {
                 showStatus(`❌ Error de Supabase:\n${error.message}`, true);
             } else {
-                showStatus(`✅ ¡Procesado con éxito!\nRuta: ${data.path}`, false);
-                fileInput.value = "";
+                showStatus(`✅ ¡Procesado con éxito!\nRuta en el storage: ${data.path}`, false);
+                fileInput.value = ""; // Limpiar input
             }
         } catch (err) {
             showStatus(`❌ Fallo en la operación:\n${err.message}`, true);
