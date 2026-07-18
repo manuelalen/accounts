@@ -8,7 +8,7 @@
 dbt_packages/
 logs/
 target/
-profiles.yml
+
 
 # Variables de entorno y llaves secretas locales
 .env
