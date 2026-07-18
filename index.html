@@ -88,11 +88,13 @@
                         })
                     });
 
+                    const result = await edgeRes.json();
                     if (!edgeRes.ok) {
-                        const errText = await edgeRes.text();
-                        showStatus(`⚠️ Archivo subido, pero error al procesar:\n${errText}`, true);
+                        showStatus(`⚠️ Archivo subido, pero error al procesar:\n${result.error || (await edgeRes.text())}`, true);
+                    } else if (result.rows > 0) {
+                        showStatus(`✅ ${result.rows} filas insertadas en bronze.stg_movimientos`, false);
                     } else {
-                        showStatus(`✅ CSV ingestado en bronze.stg_movimientos`, false);
+                        showStatus(`⚠️ Archivo subido, pero 0 filas insertadas (revisá el formato del CSV: id,monto,concepto)`, true);
                     }
                 } catch (fnErr: any) {
                     showStatus(`⚠️ Archivo subido, pero falló la función:\n${fnErr.message}`, true);
