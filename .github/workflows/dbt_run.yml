@@ -1,4 +1,4 @@
-name: dbt Run
+name: dbt Run Pipeline
 on:
   workflow_dispatch:
   repository_dispatch:
@@ -20,8 +20,8 @@ jobs:
 
       - name: Run dbt
         env:
-          # ESTA ES LA CLAVE: El nombre debe coincidir EXACTAMENTE con lo que espera tu profiles.yml
-          DBT_ENV_SECRET_PASSWORD: ${{ secrets.DBT_ENV_SECRET_PASSWORD }}
+          # Inyectamos el secreto exacto que tienes en el repositorio
+          DBT_DB_PASSWORD: ${{ secrets.DBT_DB_PASSWORD }}
         run: |
           TARGET_DATE=$(date +'%Y-%m-%d')
           dbt run --project-dir dbt --profiles-dir dbt --select stg_movimientos \

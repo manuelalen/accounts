@@ -5,7 +5,7 @@ supabase_profile:
       type: postgres
       host: "aws-1-eu-central-2.pooler.supabase.com"
       user: "postgres.fzdpeakdudjfyvgrhrqq"
-      password: "{{ env_var('DBT_ENV_SECRET_PASSWORD') }}"
+      password: "{{ env_var('DBT_DB_PASSWORD') }}"
       port: 6543
       dbname: "postgres"
       schema: bronze
