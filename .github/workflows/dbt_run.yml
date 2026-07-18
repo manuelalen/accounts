@@ -25,20 +25,17 @@ jobs:
 
       - name: Install Dependencies
         run: |
-          pip install dbt-core dbt-mysql
+          pip install "protobuf<5.0.0" dbt-core dbt-mysql
 
-      - name: Execute dbt for the Specific Date Partition
+      - name: dbt run
         env:
           DBT_ENV_SECRET_PASSWORD: ${{ secrets.DBT_DB_PASSWORD }}
         run: |
-          # Capturar los parámetros según el origen del evento
           IF_SUPABASE="${{ github.event.client_payload.execution_date }}"
           IF_MANUAL="${{ github.event.inputs.manual_date }}"
           
-          # Priorizar la fecha del Webhook; si está vacía, usar la del input manual
           TARGET_DATE=${IF_SUPABASE:-$IF_MANUAL}
           
           echo "Fecha final seleccionada para el procesamiento: $TARGET_DATE"
           
-          # CORRECCIÓN: --profiles-dir . apunta al directorio actual donde está tu profiles.yml
-          dbt run --select path.to.your.bronze.model --profiles-dir . --vars "{'target_date': '$TARGET_DATE'}"
+          dbt run --project-dir dbt --profiles-dir . --select path.to.your.bronze.model --vars "{'target_date': '$TARGET_DATE'}"
