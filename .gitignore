@@ -1,0 +1,15 @@
+# Archivos temporales e internos de Terraform
+.terraform/
+*.tfstate
+*.tfstate.backup
+.terraform.lock.hcl
+
+# Artefactos y compilaciones de dbt
+dbt_packages/
+logs/
+target/
+profiles.yml
+
+# Variables de entorno y llaves secretas locales
+.env
+*.secret

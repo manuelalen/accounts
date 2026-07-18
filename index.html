@@ -1,0 +1,72 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <title>Ingesta de Datos - Data Lake</title>
+    <!-- Cargar el cliente oficial de Supabase desde CDN -->
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <style>
+        body { font-family: sans-serif; max-width: 500px; margin: 50px auto; padding: 20px; }
+        .box { border: 1px solid #ccc; padding: 20px; border-radius: 8px; }
+        input, button { display: block; width: 100%; margin: 15px 0; padding: 10px; }
+        button { background: #3ecf8e; color: white; border: none; font-weight: bold; cursor: pointer; }
+        #status { font-weight: bold; margin-top: 15px; }
+    </style>
+</head>
+<body>
+
+<div class="box">
+    <h2>Subir CSV al Data Lake</h2>
+    <input type="file" id="csvFile" accept=".csv">
+    <button onclick="uploadToStorage()">Subir Archivo</button>
+    <div id="status"></div>
+</div>
+
+<script>
+    // 1. Configurar las credenciales de tu proyecto de Supabase
+    // Reemplaza con tu URL real y tu anon key pública de Supabase
+    const SUPABASE_URL = "https://fzdpeakdudjfyvgrhrqq.supabase.co";
+    const SUPABASE_ANON_KEY = "TU_SUPABASE_ANON_KEY_AQUÍ";
+    
+    const supabase = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+
+    async function uploadToStorage() {
+        const fileInput = document.getElementById('csvFile');
+        const statusDiv = document.getElementById('status');
+        
+        if (!fileInput.files.length) {
+            statusDiv.innerText = "❌ Por favor, selecciona un archivo CSV.";
+            return;
+        }
+
+        const file = fileInput.files[0];
+        statusDiv.innerText = "⏳ Subiendo archivo...";
+
+        // 2. Generar la ruta dinámica en formato YYYY/MM/DD
+        const ahora = new Date();
+        const yyyy = ahora.getFullYear();
+        const mm = String(ahora.getMonth() + 1).padStart(2, '0');
+        const dd = String(ahora.getDate()).padStart(2, '0');
+        
+        // Estructura final: YYYY/MM/DD/nombre_archivo.csv
+        const folderPath = `${yyyy}/${mm}/${dd}/${file.name}`;
+
+        // 3. Lanzar la subida directa a Supabase Storage
+        const { data, error } = await supabase.storage
+            .from('raw-data-lake')
+            .upload(folderPath, file, {
+                cacheControl: '3600',
+                upsert: true // Si el archivo ya existe hoy, lo sobrescribe
+            });
+
+        if (error) {
+            statusDiv.style.color = "red";
+            statusDiv.innerText = `❌ Error: ${error.message}`;
+        } else {
+            statusDiv.style.color = "green";
+            statusDiv.innerText = `✅ ¡Subido con éxito!\nRuta: ${data.path}`;
+        }
+    }
+</script>
+</body>
+</html>

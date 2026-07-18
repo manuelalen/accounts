@@ -1,0 +1,21 @@
+name: 'supabase_analytics'
+version: '1.0.0'
+config-version: 2
+
+profile: 'supabase_profile' # Debe coincidir con el nombre de perfil en tu ~/.dbt/profiles.yml
+
+model-paths: ["models"]
+analysis-paths: ["analyses"]
+test-paths: ["tests"]
+seed-paths: ["seeds"]
+macro-paths: ["macros"]
+
+# Forzamos aislamiento de esquemas: staging (vistas de limpieza) e independientes a 'public'
+models:
+  supabase_analytics:
+    staging:
+      +materialized: view
+      +schema: staging
+    marts:
+      +materialized: table
+      +schema: analytics

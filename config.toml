@@ -1,0 +1,10 @@
+[project]
+id = "id_del_proyecto_provisto_por_terraform"
+
+[api]
+port = 54321
+schemas = ["public", "graphql", "extensions"]
+
+[auth]
+site_url = "http://localhost:3000"
+jwt_expiry = 3600

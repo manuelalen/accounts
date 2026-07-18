@@ -1,0 +1,14 @@
+version: 2
+
+sources:
+  - name: supabase_prod
+    database: postgres
+    schema: public
+    tables:
+      - name: users
+        description: "Tabla espejo directa de producción desde Supabase con datos crudos de la app."
+        tests:
+          - unique:
+              column_name: id
+          - not_null:
+              column_name: id
