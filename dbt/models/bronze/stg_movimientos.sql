@@ -4,13 +4,6 @@
     unique_key='id'
 ) }}
 
-WITH source_data AS (
-    -- Aquí haces referencia a tu función externa o tabla externa que lee del storage
-    SELECT * 
-    FROM {{ source('supabase_storage', 'raw_objects') }}
-    -- Si tu motor lee directamente el bucket como un data lake parametrizado:
-    WHERE date_partition = '{{ var("target_date", run_started_at.strftime("%Y-%m-%d")) }}'
-)
 
 SELECT 
     id,
@@ -18,4 +11,9 @@ SELECT
     concepto,
     parsed_at,
     '{{ var("target_date") }}' as ingestion_day
-FROM source_data
+FROM public.read_csv_from_storage('raw-data-lake', '{{ var("target_date", "2026-07-18") | replace("-", "/") }}/movimientos.csv')
+
+{% if is_incremental() %}
+  -- Esto evita duplicados aunque el mismo archivo se procese dos veces
+  WHERE parsed_at > (SELECT MAX(parsed_at) FROM {{ this }})
+{% endif %}

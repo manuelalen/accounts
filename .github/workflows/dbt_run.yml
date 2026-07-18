@@ -1,43 +1,27 @@
-name: dbt run
-
+name: dbt Run 
 on:
-  repository_dispatch:
-    types: [storage_file_uploaded]
-
   workflow_dispatch:
     inputs:
       manual_date:
-        description: 'Fecha a procesar manualmente (formato: YYYY-MM-DD)'
-        required: true
-        default: '2026-07-18'
+        description: 'Fecha manual (YYYY-MM-DD)'
+        required: false
 
 jobs:
-  run-dbt:
+  dbt_run:
     runs-on: ubuntu-latest
     steps:
-      - name: Checkout repository
-        uses: actions/checkout@v4
-
-      - name: Setup Python
-        uses: actions/setup-python@v5
-        with:
-          python-version: '3.10'
-
-      - name: Install Dependencies
+      - uses: actions/checkout@v3
+      
+      - name: Setup Date
+        id: date
         run: |
-          # INSTALAMOS EL ADAPTADOR DE POSTGRES (SUPABASE)
-          pip install "protobuf<5.0.0" dbt-core dbt-mysql dbt-postgres
-
-      - name: dbt run
+          TARGET_DATE=${{ github.event.inputs.manual_date }}
+          TARGET_DATE=${TARGET_DATE:-$(date +'%Y-%m-%d')}
+          echo "target_date=$TARGET_DATE" >> $GITHUB_OUTPUT
+          
+      - name: dbt Run
         env:
           DBT_ENV_SECRET_PASSWORD: ${{ secrets.DBT_DB_PASSWORD }}
         run: |
-          IF_SUPABASE="${{ github.event.client_payload.execution_date }}"
-          IF_MANUAL="${{ github.event.inputs.manual_date }}"
-          
-          TARGET_DATE=${IF_SUPABASE:-$IF_MANUAL}
-          
-          echo "Fecha final seleccionada para el procesamiento: $TARGET_DATE"
-          
-          # APUNTAMOS ESTRICTAMENTE A LA CARPETA DBT PARA EL PROYECTO Y EL PERFIL
-          dbt run --project-dir dbt --profiles-dir dbt --select stg_movimientos --vars "{'target_date': '$TARGET_DATE'}"
+          dbt run --select stg_movimientos \
+                  --vars "{'target_date': '${{ steps.date.outputs.target_date }}'}"
