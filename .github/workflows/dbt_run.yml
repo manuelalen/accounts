@@ -25,7 +25,8 @@ jobs:
 
       - name: Install Dependencies
         run: |
-          pip install "protobuf<5.0.0" dbt-core dbt-mysql
+          # INSTALAMOS EL ADAPTADOR DE POSTGRES (SUPABASE)
+          pip install "protobuf<5.0.0" dbt-core dbt-mysql dbt-postgres
 
       - name: dbt run
         env:
@@ -38,4 +39,5 @@ jobs:
           
           echo "Fecha final seleccionada para el procesamiento: $TARGET_DATE"
           
-          dbt run --project-dir dbt --profiles-dir . --select path.to.your.bronze.model --vars "{'target_date': '$TARGET_DATE'}"
+          # APUNTAMOS ESTRICTAMENTE A LA CARPETA DBT PARA EL PROYECTO Y EL PERFIL
+          dbt run --project-dir dbt --profiles-dir dbt --select stg_movimientos --vars "{'target_date': '$TARGET_DATE'}"
