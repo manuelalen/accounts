@@ -1,10 +1,8 @@
 name: dbt run
 
 on:
-  
   repository_dispatch:
     types: [storage_file_uploaded]
-
 
   workflow_dispatch:
     inputs:
@@ -42,5 +40,5 @@ jobs:
           
           echo "Fecha final seleccionada para el procesamiento: $TARGET_DATE"
           
-          # Ejecutar dbt pasando la partición temporal calculada como variable interna
-          dbt run --select path.to.your.bronze.model --vars "{'target_date': '$TARGET_DATE'}"
+          # CORRECCIÓN: --profiles-dir . apunta al directorio actual donde está tu profiles.yml
+          dbt run --select path.to.your.bronze.model --profiles-dir . --vars "{'target_date': '$TARGET_DATE'}"
